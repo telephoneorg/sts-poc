@@ -21,7 +21,7 @@ https://897qfp0jei.execute-api.us-east-1.amazonaws.com/dev/graphql
 * run GetMe query (at any time to see your user)
 * run UpdateUserProfile mutation ... using profile id from last query
 * run UpdateUserNotificationPolicy mutation ... using notificationPolicy id ...
-* trim these queries and mutations down to only what you need
+* trim these queries and mutations down to only what you need, I added everything I could so it would be easier to trim away to what you need.
 
 
 ## Graphql API
@@ -82,7 +82,7 @@ query GetMe {
 
 #### Node
 ```graphql
-{ node }
+{ node(id: "{ANY_ID_HERE}") }
 ```
 
 ### Mutations
