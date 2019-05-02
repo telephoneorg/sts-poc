@@ -1,0 +1,17 @@
+dev:
+  app_function: sts.app.app
+  aws_region: us-east-1
+  profile_name: default
+  project_name: sts
+  runtime: python3.7
+  s3_bucket: sts-backend
+  exclude:
+  - .git
+  - venv
+  environment_variables:
+    COGNITO_REGION: us-east-1
+    COGNITO_USERPOOL_ID: us-east-1_pdrrhWtb9
+    SQLALCHEMY_DATABASE_URI: sqlite:///db.db
+  slim_handler: true
+  cors: true
+

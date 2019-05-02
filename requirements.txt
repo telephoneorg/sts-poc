@@ -1,0 +1,9 @@
+sqlalchemy
+mysql-python
+sqlalchemy_utils
+graphene
+graphene_sqlalchemy
+cognitojwt
+flask
+flask_graphql
+flask_sqlalchemy
