@@ -11,8 +11,8 @@ dev:
   aws_environment_variables:
     COGNITO_REGION: us-east-1
     COGNITO_USERPOOL_ID: us-east-1_pdrrhWtb9
-    SQLALCHEMY_DATABASE_URI: sqlite:///db.db
-  slim_handler: true
+    SQLALCHEMY_DATABASE_URI: mysql+pymysql://root:TbtjkTxRaamC3ZvGvuEUfngs@sts-dev2-db.cluster-cxxwptxqt1gl.us-east-1.rds.amazonaws.com:3306/sts
+  # slim_handler: true
   cors: true
 dev2:
   app_function: sts.app.app

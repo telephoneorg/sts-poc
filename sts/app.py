@@ -1,11 +1,16 @@
 from argparse import Namespace
 
-from flask import Flask, request
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_graphql import GraphQLView
 from flask_cors import CORS
 
-from .cognito_auth import CognitoAuth, current_user, current_cognito_jwt, load_jwt_tokens
+from .cognito_auth import (
+    CognitoAuth,
+    current_user,
+    current_cognito_jwt,
+    load_jwt_tokens,
+)
 from . import schema
 from . import models
 
@@ -14,7 +19,11 @@ app = Flask(__name__)
 app.config.from_object("sts.config.Config")
 db = SQLAlchemy(app, metadata=models.Base.metadata)
 cogauth = CognitoAuth(app)
-cors = CORS(app, supports_credentials=app.config['CORS_ALLOW_CREDENTIALS_GLOBAL'], origins=app.config['CORS_ORIGINS_GLOBAL'])
+cors = CORS(
+    app,
+    supports_credentials=app.config["CORS_ALLOW_CREDENTIALS_GLOBAL"],
+    origins=app.config["CORS_ORIGINS_GLOBAL"],
+)
 
 
 @app.before_first_request

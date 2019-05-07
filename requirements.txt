@@ -9,3 +9,4 @@ flask_graphql
 flask_sqlalchemy
 flask_cors
 requests
+zappa

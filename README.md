@@ -143,7 +143,25 @@ mutation CreateUser($input: CreateUserInput!) {
 ```
 
 ```json
-{"input": {"firstName": "Joe", "lastName": "Black", "cellPhone": "+14155552671"}}
+{
+  "input": {
+    "user": {
+      "firstName": "Joseph",
+      "lastName": "Black",
+      "cellPhone": "+14155552671"
+    },
+    "profile": {
+      "displayName": "Joe",
+      "avatar": "https://example.com/image.jpg",
+      "bio": "My bio\n\nThanks for viewing!"
+    },
+    "notificationPolicy": {
+      "allowEmail": true,
+      "allowSms": true,
+      "allowMarketing": false
+    }
+  }
+}
 ```
 
 #### UpdateUser
@@ -202,47 +220,19 @@ mutation UpdateMyUser($input: UpdateUserInput!) {
 ```
 
 ```json
-{"input": {"firstName": "Joe New"}}
-```
-
-#### UpdateUserProfile
-```graphql
-mutation UpdateMyUserProfile($input: UpdateUserProfileInput!) {
-  updateUserProfile(input: $input) {
-    ok
-    profile {
-      id
-      displayName
-      avatar
-      bio
-      created
-      updated
+{
+  "input": {
+    "user": {
+      "lastName": "White"
+    },
+    "contextId": "VXNlckNvbnRleHQ6MQ==",
+    "profile": {
+      "displayName": "Joe White"
+    },
+    "notificationPolicy": {
+      "allowMarketing": true
     }
   }
 }
 ```
-
-```json
-{"input": {"id": "VXNlclByb2ZpbGU6MQ==", "displayName": "Joe Nickname"}}
-```
-
-#### UpdateUserNotificationPolicy
-```graphql
-mutation UpdateMyUserNotificationPolicy($input: UpdateUserNotificationPolicyInput!) {
-  updateUserNotificationPolicy(input: $input) {
-    ok
-    notificationPolicy {
-      id
-      allowSms
-      allowEmail
-      allowMarketing
-      created
-      updated
-    }
-  }
-}
-```
-
-```json
-{"input": {"id": "{NOTIFICATION_PROFILE_ID}", "allowSms": false}}
-```
+*Note: `contextId` is the id of the context object returned from me, and you should likely store this on the client somewhere as `currentUserContextID` or whatever, since almost all of the graphql calls in the future will need to know this.
