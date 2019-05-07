@@ -3,24 +3,8 @@ import graphene as gr
 from graphene import relay
 from graphene_sqlalchemy import SQLAlchemyConnectionField, SQLAlchemyObjectType, utils
 
-# from graphene_sqlalchemy.converter import (
-#     convert_sqlalchemy_type,
-#     get_column_doc,
-#     is_column_nullable,
-# )
-# from sqlalchemy_utils import ArrowType
-
 from . import enums
 from . import models
-
-
-# @convert_sqlalchemy_type.register(ArrowType)
-# def convert_column_to_datetime(type, column, registry=None):
-#     from graphene.types.datetime import DateTime
-
-#     return DateTime(
-#         description=get_column_doc(column), required=not (is_column_nullable(column))
-#     )
 
 
 UserContextType = gr.Enum.from_enum(enums.UserContextType)
@@ -117,23 +101,37 @@ class Query(gr.ObjectType):
             raise GraphQLError("User Not authenticated")
 
 
+class UserFields(gr.AbstractType):
+    first_name = gr.String()
+    last_name = gr.String()
+    cell_phone = gr.String()
+
+
+class NewUserFields(UserFields):
+    first_name = gr.String(required=True)
+    last_name = gr.String(required=True)
+
+
+class UserInput(gr.InputObjectType, UserFields):
+    pass
+
+
+class NewUserInput(gr.InputObjectType, NewUserFields):
+    pass
+
+
 class CreateUser(relay.ClientIDMutation):
     class Input:
-        first_name = gr.String(required=True)
-        last_name = gr.String(required=True)
-        cell_phone = gr.String()
+        user = gr.Field(lambda: NewUserInput, required=True)
+        profile = gr.Field(lambda: UserProfileInput, required=True)
+        notification_policy = gr.Field(lambda: NotificationPolicyInput, required=True)
 
     ok = gr.Boolean()
     user = gr.Field(User)
 
     @classmethod
     def mutate_and_get_payload(cls, root, info, **data):
-        # from . import app
-
-        if info.context.current_user:
-            raise GraphQLError("User already has an account!")
-        if not info.context.current_jwt:
-            raise GraphQLError("User not authenticated")
+        raise_for_user_auth_errors(info.context)
 
         session = info.context.session
         current_jwt = info.context.current_jwt
@@ -143,12 +141,12 @@ class CreateUser(relay.ClientIDMutation):
             identities=[models.Identity(subject=current_jwt.get("sub"))],
             contexts=[
                 models.Participant(
-                    profile=models.UserProfile(display_name=data.get("first_name"))
+                    profile=models.UserProfile(**data.get("profile", {}))
                 )
             ],
-            notification_policy=models.NotificationPolicy(),
+            notification_policy=models.NotificationPolicy(**data.get("notification_policy", {})),
             financial_details=models.FinancialDetails(),
-            **data,
+            **data.get("user"),
         )
         session.add(user)
         session.commit()
@@ -158,115 +156,139 @@ class CreateUser(relay.ClientIDMutation):
 
 class UpdateUser(relay.ClientIDMutation):
     class Input:
-        first_name = gr.String()
-        last_name = gr.String()
-        cell_phone = gr.String()
+        user = gr.Field(lambda: UserInput)
+        notification_policy = gr.Field(lambda: NotificationPolicyInput)
 
     ok = gr.Boolean()
     user = gr.Field(User)
 
     @classmethod
     def mutate_and_get_payload(cls, root, info, **data):
-        # from .app import app
-
-        if not info.context.current_jwt:
-            raise GraphQLError("User not authenticated")
-        if not info.context.current_user:
-            raise GraphQLError("User doesn't exist")
+        raise_for_user_auth_errors(info.context)
 
         session = info.context.session
-        user = info.context.current_user._get_current_object()
-        for key, val in data.items():
-            setattr(user, key, val)
+
+        current_user = info.context.current_user._get_current_object()
+
+        patch_model(current_user, data.get("user"))
+        patch_model(current_user.notification_policy, data.get("notification_policy"))
+
+        # for key, val in data.get("user", {}).items():
+        #     setattr(current_user, key, val)
+
+        # for key, val in data.get("notification_policy", {}).items():
+        #     setattr(current_user.notification_policy, key, val)
+
         session.commit()
+        ok = True
+        return cls(ok=ok, user=current_user)
+        # user = models.User(
+        #     email=current_jwt.get("email"),
+        #     identities=[models.Identity(subject=current_jwt.get("sub"))],
+        #     contexts=[
+        #         models.Participant(
+        #             profile=models.UserProfile(**data.get("profile"))
+        #         )
+        #     ],
+        #     notification_policy=models.NotificationPolicy(**data.get("notification_policy")),
+        #     financial_details=models.FinancialDetails(),
+        #     **data.get("user"),
+        # )
+
         # query = User.get_query(info).filter(models.User.id == current_user.id)
         # query = session.query(models.User).filter_by(id=current_user.id)
-        ok = True
         # user = query.one_or_none()
         # session.commit()
 
-        return cls(ok=ok, user=user)
+
+class UserProfileFields(gr.AbstractType):
+    display_name = gr.String()
+    avatar = gr.String()
+    bio = gr.String()
 
 
-# class UpdateUserProfileProfileInput(gr.InputObjectType):
-#     display_name = gr.String()
-#     avatar = gr.String()
-#     bio = gr.String()
+class UserProfileInput(gr.InputObjectType, UserProfileFields):
+    display_name = gr.String()
+    avatar = gr.String()
+    bio = gr.String()
+
+
+
+def get_user_context(user, context_id, info):
+    context = relay.Node.get_node_from_global_id(
+        info, context_id, only_type=UserContext
+    )
+    if not context.user_id == user.id:
+        raise GraphQLError("User context is invalid")
+    return context
+
+
+def patch_model(model, data=None):
+    data = data or dict()
+    for key, val in data.items():
+        setattr(model, key, val)
+
+
+def raise_for_user_auth_errors(context):
+    if not context.current_jwt:
+            raise GraphQLError("User not authenticated")
+    if not context.current_user:
+        raise GraphQLError("User doesn't exist")
 
 
 class UpdateUserProfile(relay.ClientIDMutation):
     class Input:
-        id = gr.ID(required=True)
-        display_name = gr.String()
-        avatar = gr.String()
-        bio = gr.String()
+        user_context_id = gr.ID(required=True)
+        profile = gr.Field(UserProfileInput, required=True)
 
     ok = gr.Boolean()
     profile = gr.Field(UserProfile)
 
     @classmethod
     def mutate_and_get_payload(cls, root, info, **data):
-        # from .app import app
-
-        if not info.context.current_jwt:
-            raise GraphQLError("User not authenticated")
-        if not info.context.current_user:
-            raise GraphQLError("User doesn't exist")
-
-        # app.logger.info(f"data: {data}")
+        raise_for_user_auth_errors(info.context)
 
         session = info.context.session
         current_user = info.context.current_user._get_current_object()
-        profile = relay.Node.get_node_from_global_id(
-            info, data.pop("id"), only_type=UserProfile
-        )
-        # app.logger.info(f"profile: {profile}")
-        if profile.user_context.user_id == current_user.id:
-            for key, val in data.items():
-                setattr(profile, key, val)
+        current_user_context = get_user_context(current_user, context_id=data.get("user_context_id"), info=info)
+        profile = current_user_context.profile
+        patch_model(profile, data=data.get("profile"))
 
-            session.commit()
-            ok = True
-        else:
-            ok = False
+        session.commit()
+        ok = True
         return cls(ok=ok, profile=profile)
 
 
+class NotificationPolicyFields(gr.AbstractType):
+    allow_email = gr.Boolean()
+    allow_sms = gr.Boolean()
+    allow_marketing = gr.Boolean()
+
+
+class NotificationPolicyInput(gr.InputObjectType, NotificationPolicyFields):
+    pass
+
+
 class UpdateUserNotificationPolicy(relay.ClientIDMutation):
-    class Input:
-        id = gr.ID(required=True)
-        allow_email = gr.Boolean()
-        allow_sms = gr.Boolean()
-        allow_marketing = gr.Boolean()
+    Input = NotificationPolicyFields
 
     ok = gr.Boolean()
     notification_policy = gr.Field(NotificationPolicy)
 
     @classmethod
     def mutate_and_get_payload(cls, root, info, **data):
-        # from .app import app
-
-        if not info.context.current_jwt:
-            raise GraphQLError("User not authenticated")
-        if not info.context.current_user:
-            raise GraphQLError("User doesn't exist")
-
-        # app.logger.info(f"data: {data}")
+        raise_for_user_auth_errors(info.context)
 
         session = info.context.session
         current_user = info.context.current_user._get_current_object()
-        notification_policy = relay.Node.get_node_from_global_id(
-            info, data.pop("id"), only_type=NotificationPolicy
-        )
-        # app.logger.info(f"profile: {profile}")
-        if notification_policy.user_id == current_user.id:
-            for key, val in data.items():
-                setattr(notification_policy, key, val)
+        notification_policy = current_user.notification_policy
 
-            session.commit()
-            ok = True
-        else:
-            ok = False
+        patch_model(notification_policy, data=data.get("notification_policy"))
+        # for key, val in data.get("notification_policy", {}).items():
+        #     setattr(notification_policy, key, val)
+
+        session.commit()
+        ok = True
         return cls(ok=ok, notification_policy=notification_policy)
 
 
